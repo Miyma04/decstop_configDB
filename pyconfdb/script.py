@@ -7,6 +7,8 @@ import time
 import configparser
 import threading
 from datetime import datetime
+from croniter import croniter
+import sys
 
 config = configparser.ConfigParser()
 config.read("config.ini", encoding="utf-8")
@@ -96,6 +98,21 @@ def start_scheduled_task():
         schedule.every(interval).minutes.do(execute_query)
         messagebox.showinfo("Расписание", f"Запрос будет выполняться каждые {interval} минут")
 
+    elif schedule_mode == "cron":
+        cron_expr = config["Settings"]["schedule_cron"]
+        next_run = croniter(cron_expr, datetime.now()).get_next(datetime)
+        messagebox.showinfo("Расписание", f"Запрос будет выполняться по cron-расписанию: {cron_expr}")
+
+        def cron_scheduler():
+            while True:
+                now = datetime.now()
+                next_run = croniter(cron_expr, now).get_next(datetime)
+                sleep_time = (next_run - now).total_seconds()
+                time.sleep(sleep_time)
+                execute_query()
+
+        threading.Thread(target=cron_scheduler, daemon=True).start()
+
     def run_scheduler():
         while True:
             schedule.run_pending()
@@ -129,6 +146,9 @@ radio_time.pack(anchor="w")
 
 radio_interval = tk.Radiobutton(frame_schedule, text="Отправка через интервал", variable=schedule_var, value="interval")
 radio_interval.pack(anchor="w")
+
+radio_cron = tk.Radiobutton(frame_schedule, text="Отправка по cron-расписанию", variable=schedule_var, value="cron")
+radio_cron.pack(anchor="w")
 
 btn_schedule = tk.Button(root, text="Запустить отправку", command=start_scheduled_task)
 btn_schedule.pack(pady=5)
