@@ -10,7 +10,7 @@ sudo apt install python3-pip
 ## Установка зависимостей
 Выполнить в консоле:
 ```sh
-pip install psycopg2 requests schedule
+pip install psycopg2 requests schedule croniter 
 ```
 (tkinter встроен в стандартную библиотеку Python и не требует установки)
 
@@ -25,13 +25,16 @@ configparser – работа с config.ini
 time – задержки в коде
 datetime – работа с датой и временем
 threading – многопоточное выполнение задач
+croniter - cron таймер
 
 ## Сборка(Windows)
 ```sh
 pip install pyinstaller
 pyinstaller --onefile --windowed app.py
 ```
-В папке с проектом появится папка dist, внутри будет скомпилированный исполняемый файл
+В папке с проектом появится папка dist, внутри будет скомпилированный исполняемый файл.
+## Работа с exe- файлом
+Для корректной работы рекомендуется испольняемый файл переместить в папку к остальным файлам(zapros.sql ; config.ini и т.д.)
 
 ## Настройка config.ini
 Для подключения к базе данных и отправки сообщений через tg в config.ini вместо x в соответсвующих строках нужно указать значения(например: user = x, заменить user = root)
@@ -39,19 +42,20 @@ pyinstaller --onefile --windowed app.py
 
 ## Настройка zapros.sql
 В zapros.sql должен находится запрос который будет отправляться базе данных и ответ сохраняться в output.txt, далее отправлятся в настроенный канал или пользователю.
-Он также поддерживает многострочные запросы.
+Для предотвращения проблем с SQL запросами следует правильно экранировать строки с одиночными ковычками('), также sycopg2 не всегда корректно обрабатывает .sql файлы с несколькими SQL-командами, разделёнными ;.
+Поэтому если используется много команд — используй .execute() для каждой по отдельности.
 
 ## Пример запроса
 ```
-WITH recent_orders AS (
-    SELECT user_id, MAX(order_date) AS last_order_date
-    FROM orders
-    GROUP BY user_id
-)
-SELECT u.id, u.username, r.last_order_date
-FROM users u
-LEFT JOIN recent_orders r ON u.id = r.user_id
-WHERE r.last_order_date > NOW() - INTERVAL '30 days';
+with open(config["Settings"]["sql_file"], "r") as sql_file:
+    sql_queries = sql_file.read().split(";")  # Разделяем по `;`
+    
+with psycopg2.connect(**db_params) as conn:
+    with conn.cursor() as cur:
+        for query in sql_queries:
+            if query.strip():  
+                cur.execute(query)
+
 ```
 
 ## error_log.txt 
@@ -76,6 +80,7 @@ WHERE r.last_order_date > NOW() - INTERVAL '30 days';
 Выбор режима отправки:
 "Отправка в заданное время" — выполняет запрос в конкретное время.
 "Отправка через интервал" — выполняет запрос каждые N минут.
+"Отправка по cron-расписанию" - выполняет запрос по cron расписанию.
 Выбор получателя Telegram:
 "Отправка пользователю" — данные отправляются в личные сообщения.
 "Отправка в канал" — данные отправляются в канал Telegram.
